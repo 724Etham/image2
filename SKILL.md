@@ -17,7 +17,8 @@ Run this sequence:
 
 1. Identify the operation: `generate`, `reference-led`, or `edit`.
 2. Identify the asset and intended surface.
-3. Route the task to one primary objective mode.
+2a. If any reference image is supplied, activate the reference-present gate: classify every file, extract role-specific evidence, assign stable image numbers, verify that each file is accessible, and pass the same ordered files through the image-generation or editing call. A reference described in prose but not attached to the actual reference input is considered unused.
+3. Route the brief to one primary objective mode.
 4. Build a brief with facts, invariants, variables, assumptions, and risks.
 5. Define the first-glance target and the success contract.
 6. Select the scenario contract and rubric from the references.
@@ -52,6 +53,18 @@ Classify every supplied image with one narrow role:
 If the user requests an earlier prompt version, restore that version instead of silently improving it. Read `references/versioning.md` for version rules. Read `references/reference-roles.md` before using complex or multiple references.
 
 Do not turn an edit into a new generation. Do not copy a reference merely because it is available. Preserve the requested role boundary.
+
+### Reference-present gate
+
+If one or more images are supplied, do not write the final prompt or make the image call until the reference handoff is complete:
+
+1. Create an ordered manifest: `Image 1`, `Image 2`, and so on. Keep the order identical in the prompt and in the actual `references` input.
+2. Assign exactly one primary role to every image: edit target, product, identity, composition, style, material, or result evidence.
+3. Extract role-specific evidence: what must be preserved, what may be borrowed, what must not be copied, and which details remain uncertain.
+4. Mark the task as `reference-led` when a new image depends on a reference, or `edit` when an existing image must be changed. Do not silently fall back to text-only generation.
+5. Pass the actual accessible image paths in the generation or editing request. Mentioning a file path only inside the prose prompt does not use the reference.
+6. Repeat the role mapping in the prompt so the model can distinguish the edit target from product, identity, style, or composition references.
+7. If a supplied image cannot be accessed, stop and ask for it again or disclose that the result will be reference-free. Never pretend that an unavailable reference was used.
 
 ## 2. Route the task by objective
 
@@ -159,7 +172,7 @@ Use this order, adapting the fields to the routed objective:
 6. Scene, composition, camera, and reading order.
 7. Material, lighting, color, and rendering logic.
 8. Exact in-image text and typography rules, if required.
-9. Reference roles and evidence constraints.
+9. Reference roles, evidence constraints, and the ordered reference handoff.
 10. Targeted avoid-list and output constraints.
 
 Use concrete nouns and verbs. Keep one style anchor, one coherent palette, one main lighting logic, and only the negative constraints that prevent likely failure. Remove filler such as “8K,” “masterpiece,” “best quality,” or “trending on ArtStation.”
@@ -217,7 +230,27 @@ Quote every required in-image string verbatim exactly once. When the task requir
 
 ## 10. Reference and edit gates
 
-Read `references/reference-roles.md` for evidence extraction and `references/operation-gates.md` for research, edit boundaries, and provider-neutral cautions.
+Read `references/reference-roles.md` for evidence extraction, `references/reference-execution.md` for the ordered handoff protocol, and `references/operation-gates.md` for research, edit boundaries, and provider-neutral cautions.
+
+### Reference handoff
+
+For every reference-led generation or edit with supplied images, create this handoff before calling the image model:
+
+```text
+Reference manifest:
+- Image 1 — [role] — [accessible path] — [must preserve]
+- Image 2 — [role] — [accessible path] — [must preserve]
+
+Reference evidence:
+- Image 1: [role-specific evidence]
+- Image 2: [role-specific evidence]
+
+Prompt mapping:
+- Image 1 is ...
+- Image 2 is ...
+```
+
+When making the image call, pass the same ordered files as the actual `references` input. For an edit, put the edit target first unless the provider requires a different source-image field; if so, document the provider-specific mapping. For a new image, pass only the references that materially control the result. Do not pass result-evidence images as references unless the user explicitly requests continuity.
 
 For edits, begin with:
 
@@ -287,11 +320,12 @@ Before generating or delivering a prompt, verify:
 1. Operation, asset, surface, format, and primary objective are explicit.
 2. Known facts, invariants, variables, assumptions, and risks are separated.
 3. The success contract is specific and appropriate to the objective.
-4. The reference roles are explicit and evidence has been extracted when needed.
-5. The prompt contains one clear visual anchor or reading path.
-6. Required text is quoted verbatim exactly once, or text is intentionally prohibited.
-7. The prompt version is recorded and an earlier version has not been silently rewritten.
-8. The avoid-list targets likely errors without becoming a contradictory style pile.
+4. When images are supplied, every file has an explicit role, ordered manifest entry, extracted evidence, accessible path, and actual reference handoff; no reference is only described in prose.
+5. The reference order in the prompt matches the order in the actual image call.
+6. The prompt contains one clear visual anchor or reading path.
+7. Required text is quoted verbatim exactly once, or text is intentionally prohibited.
+8. The prompt version is recorded and an earlier version has not been silently rewritten.
+9. The avoid-list targets likely errors without becoming a contradictory style pile.
 
 After generation, inspect the rendered file on two axes:
 
@@ -318,8 +352,10 @@ If the user asks for several concepts, keep the asset and objective stable while
 - Read `references/prompt-contracts.md` for scenario-specific prompt fields and examples.
 - Read `references/review-rubrics.md` for dynamic scoring and failure thresholds.
 - Read `references/reference-roles.md` for reference classification and evidence extraction.
+- Read `references/reference-execution.md` for the ordered manifest, actual reference handoff, and missing-reference failure rules.
 - Read `references/versioning.md` for Prompt Ledger records, restoration, and iteration history.
 - Read `references/intent-matrix.md` for the legacy asset-format starting point when routing is uncertain.
 - Read `references/operation-gates.md` for research decisions, edit boundaries, and provider-neutral cautions.
 - Read `references/sources.md` only when reporting upstream sources or updating this skill.
 - Run `scripts/route_brief.py` for an unusually short or ambiguous brief when a deterministic first-pass route is useful.
+- Run `scripts/reference_manifest.py` when several supplied images need a deterministic file-and-role manifest before generation or editing.
